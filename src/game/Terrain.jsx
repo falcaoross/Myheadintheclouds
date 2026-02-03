@@ -23,7 +23,7 @@ export default function Terrain() {
   return (
     <RigidBody type="fixed" colliders="trimesh">
       <mesh geometry={geometry} receiveShadow>
-        <meshStandardMaterial color="#4d7a4a" roughness={0.95} metalness={0.02} />
+        <meshStandardMaterial color="#4d7a4a" roughness={1} />
       </mesh>
     </RigidBody>
   );

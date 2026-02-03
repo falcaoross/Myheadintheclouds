@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { RigidBody } from "@react-three/rapier";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
-import { useAnimations, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { SkeletonUtils } from "three-stdlib";
 import { useGameStore } from "../state/useGameStore.js";
 import { usePlayerControls } from "../systems/Controls.js";
 
@@ -12,28 +11,19 @@ const WANDER_RADIUS = 12;
 const WANDER_SPEED = 0.7;
 const MOUNT_SPEED = 2.0;
 
-useGLTF.setDRACOLoader(() => {
-  const dracoLoader = new DRACOLoader();
-  // Draco decoder path expected under public/draco; keeps GLB payloads tiny.
-  dracoLoader.setDecoderPath("/draco/");
-  return dracoLoader;
-});
-
 function seededRandom(seed) {
   return Math.sin(seed) * 10000 - Math.floor(Math.sin(seed) * 10000);
 }
 
 export default function Animal({ id, url, position, mountable = false, name = "Animal" }) {
+  const [model, setModel] = useState(null);
+  const [mixer, setMixer] = useState(null);
   const rigidBody = useRef(null);
   const group = useRef(null);
   const interactionMesh = useRef(null);
   const mountPoint = useRef(null);
-  const [hasMountPoint, setHasMountPoint] = useState(false);
   const petPulse = useRef(0);
   const lastPetTime = useRef(0);
-  const lastInteractTime = useRef(0);
-  const activeAction = useRef(null);
-  const currentSpeed = useRef(0);
   const waypoint = useRef(new THREE.Vector3(position[0], position[1], position[2]));
   const basePosition = useMemo(() => new THREE.Vector3(...position), [position]);
 
@@ -44,112 +34,69 @@ export default function Animal({ id, url, position, mountable = false, name = "A
   const registerAnimal = useGameStore((state) => state.registerAnimal);
   const unregisterAnimal = useGameStore((state) => state.unregisterAnimal);
   const audioController = useGameStore((state) => state.audioController);
-  const playerIsGrounded = useGameStore((state) => state.playerIsGrounded);
-  const { scene, animations } = useGLTF(url);
-  const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
-  const { actions } = useAnimations(animations, group);
-  const tint = useMemo(() => {
-    const base = new THREE.Color(0xffffff);
-    const hueShift = (id.charCodeAt(0) % 12) / 120;
-    return base.offsetHSL(hueShift, 0, 0);
-  }, [id]);
 
-  // Map animation clips by keywords so realistic models can supply their own names.
-  const pickClipName = (candidates) => {
-    if (!animations?.length) return null;
-    const lower = animations.map((clip) => clip.name.toLowerCase());
-    const matchIndex = lower.findIndex((name) =>
-      candidates.some((candidate) => name.includes(candidate))
-    );
-    return matchIndex >= 0 ? animations[matchIndex].name : animations[0]?.name;
-  };
-
-  const clips = useMemo(
-    () => ({
-      idle: pickClipName(["idle", "breath"]),
-      walk: pickClipName(["walk"]),
-      rideWalk: pickClipName(["ride", "ride_walk", "trot"]),
-      rideIdle: pickClipName(["ride_idle", "idle"]),
-      interact: pickClipName(["interact", "head", "tail"]),
-    }),
-    [animations]
-  );
-
-  const playAction = (name, fade = 0.2) => {
-    if (!actions || !actions[name] || activeAction.current === name) return;
-    const next = actions[name];
-    next.reset().fadeIn(fade).play();
-    if (activeAction.current && actions[activeAction.current]) {
-      actions[activeAction.current].fadeOut(fade);
-    }
-    activeAction.current = name;
-  };
-
-  const canMount = () =>
-    mountable &&
-    Date.now() - lastPetTime.current < 5000 &&
-    Date.now() - lastInteractTime.current > 1200 &&
-    currentSpeed.current < 0.2;
+  const canMount = () => mountable && Date.now() - lastPetTime.current < 5000;
 
   useEffect(() => {
-    // Tune materials for realistic fur/skin without expensive shaders.
-    clonedScene.traverse((child) => {
-      if (!child.isMesh || !child.material) return;
-      child.castShadow = true;
-      child.receiveShadow = true;
-      const material = child.material;
-      material.metalness = 0;
-      material.roughness = 0.7;
-      if (material.color) {
-        material.color.lerp(tint, 0.08);
+    let active = true;
+    const loader = new GLTFLoader();
+    const dracoLoader = new DRACOLoader();
+    // Draco decoder path expected under public/draco; keeps GLB payloads tiny.
+    dracoLoader.setDecoderPath("/draco/");
+    loader.setDRACOLoader(dracoLoader);
+    loader.load(
+      url,
+      (gltf) => {
+        if (!active) return;
+        gltf.scene.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        setModel(gltf.scene);
+        if (gltf.animations.length > 0) {
+          const mixerInstance = new THREE.AnimationMixer(gltf.scene);
+          mixerInstance.clipAction(gltf.animations[0]).play();
+          setMixer(mixerInstance);
+        }
+      },
+      undefined,
+      () => {
+        if (active) setModel(null);
+        dracoLoader.dispose();
       }
-      if (material.map) {
-        material.map.colorSpace = THREE.SRGBColorSpace;
-      }
-      material.needsUpdate = true;
-    });
+    );
 
-    const resolvedMount = clonedScene.getObjectByName("MountPoint");
-    if (resolvedMount) {
-      mountPoint.current = resolvedMount;
-      setHasMountPoint(true);
-    }
-  }, [clonedScene]);
+    return () => {
+      active = false;
+      dracoLoader.dispose();
+    };
+  }, [url]);
 
   useEffect(() => {
     const data = {
       id,
       name,
       mountable,
-      isRideable: mountable,
       canMount,
       interactionMesh: interactionMesh.current,
       mountPoint,
-      rigidBody,
       onInteract: () => {
         if (mountedAnimalId === id) {
           dismount();
           return;
         }
 
-        if (mountable && canMount() && playerIsGrounded) {
+        if (mountable && canMount()) {
           mountAnimal(id);
           return;
         }
 
         lastPetTime.current = Date.now();
-        lastInteractTime.current = Date.now();
         petPulse.current = 1;
         if (audioController) {
           audioController.playOneShot("/audio/animal-chirp.mp3", 0.8);
-        }
-        if (clips.interact && actions?.[clips.interact]) {
-          const action = actions[clips.interact];
-          action.reset();
-          action.setLoop(THREE.LoopOnce, 1);
-          action.clampWhenFinished = true;
-          action.fadeIn(0.1).play();
-          activeAction.current = clips.interact;
         }
       },
     };
@@ -173,12 +120,13 @@ export default function Animal({ id, url, position, mountable = false, name = "A
   ]);
 
   useFrame((state, delta) => {
+    if (mixer) mixer.update(delta);
+
     if (!rigidBody.current) return;
 
     const isMounted = mountedAnimalId === id;
     const target = waypoint.current;
 
-    let horizontalSpeed = 0;
     if (!isMounted) {
       const current = rigidBody.current.translation();
       const currentPosition = new THREE.Vector3(current.x, current.y, current.z);
@@ -194,7 +142,6 @@ export default function Animal({ id, url, position, mountable = false, name = "A
       const direction = target.clone().sub(currentPosition).normalize();
       const next = currentPosition.clone().add(direction.multiplyScalar(WANDER_SPEED * delta));
       rigidBody.current.setNextKinematicTranslation({ x: next.x, y: next.y, z: next.z });
-      horizontalSpeed = direction.length();
       const angle = Math.atan2(direction.x, direction.z);
       const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle, 0));
       rigidBody.current.setNextKinematicRotation(rotation);
@@ -212,31 +159,9 @@ export default function Animal({ id, url, position, mountable = false, name = "A
           movement.multiplyScalar(MOUNT_SPEED * delta)
         );
         rigidBody.current.setNextKinematicTranslation({ x: next.x, y: next.y, z: next.z });
-        horizontalSpeed = movement.length();
         const angle = Math.atan2(movement.x, movement.z);
         const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle, 0));
         rigidBody.current.setNextKinematicRotation(rotation);
-      }
-    }
-
-    currentSpeed.current = horizontalSpeed;
-
-    if (actions && clips.idle) {
-      const isInteracting = Date.now() - lastInteractTime.current < 1200;
-      if (isMounted) {
-        if (horizontalSpeed > 0.1 && clips.rideWalk) {
-          playAction(clips.rideWalk, 0.2);
-        } else if (clips.rideIdle) {
-          playAction(clips.rideIdle, 0.2);
-        } else {
-          playAction(clips.idle, 0.2);
-        }
-      } else if (isInteracting && clips.interact) {
-        playAction(clips.interact, 0.1);
-      } else if (horizontalSpeed > 0.1 && clips.walk) {
-        playAction(clips.walk, 0.2);
-      } else {
-        playAction(clips.idle, 0.2);
       }
     }
 
@@ -254,8 +179,15 @@ export default function Animal({ id, url, position, mountable = false, name = "A
   return (
     <RigidBody ref={rigidBody} type="kinematicPosition" colliders="hull">
       <group ref={group} position={position}>
-        <primitive object={clonedScene} />
-        {!hasMountPoint && <group ref={mountPoint} position={[0, 1.4, 0.4]} />}
+        {model ? (
+          <primitive object={model} />
+        ) : (
+          <mesh castShadow>
+            <boxGeometry args={[1.2, 1, 2]} />
+            <meshStandardMaterial color={mountable ? "#8a6b4b" : "#7a7f90"} />
+          </mesh>
+        )}
+        <group ref={mountPoint} position={[0, 1.4, 0.4]} />
         <mesh ref={interactionMesh} position={[0, 0.8, 0]}>
           <sphereGeometry args={[1.4, 16, 16]} />
           <meshStandardMaterial color="#ffffff" transparent opacity={0} />

@@ -69,7 +69,6 @@ export default function HUD() {
           <div>Mouse - Look</div>
           <div>Space - Jump</div>
           <div>E - Interact</div>
-          <div>F - Dismount</div>
           <div>H - Toggle HUD</div>
         </div>
       )}

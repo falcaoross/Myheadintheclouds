@@ -6,7 +6,6 @@ const initialState = {
   interactionText: "",
   interactionTarget: null,
   mountedAnimalId: null,
-  playerIsGrounded: false,
   animals: new Map(),
   playerRef: null,
   audioController: null,
@@ -20,7 +19,6 @@ export const useGameStore = create((set, get) => ({
   clearInteraction: () => set({ interactionText: "", interactionTarget: null }),
   mountAnimal: (animalId) => set({ mountedAnimalId: animalId }),
   dismount: () => set({ mountedAnimalId: null }),
-  setPlayerGrounded: (isGrounded) => set({ playerIsGrounded: isGrounded }),
   setPlayerRef: (ref) => set({ playerRef: ref }),
   registerAnimal: (animalId, data) => {
     const animals = new Map(get().animals);

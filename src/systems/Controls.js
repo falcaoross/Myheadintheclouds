@@ -14,7 +14,6 @@ export const usePlayerControls = () => {
         right: state.right,
         jump: state.jump,
         interact: state.interact,
-        dismount: state.dismount,
         toggleUi: state.toggleUi,
       };
     },

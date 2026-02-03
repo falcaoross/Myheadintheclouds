@@ -24,15 +24,14 @@ npm run dev
 
 ## Asset expectations
 
-Provide realistic, Draco-compressed GLB models in `public/models/` and audio in `public/audio/`:
+Provide low-poly, Draco-compressed GLB models in `public/models/` and audio in `public/audio/`:
 
 - `public/models/deer.glb`
-- `public/models/dog.glb`
-- `public/models/horse.glb`
-- `public/models/bear.glb`
-- `public/models/player.glb`
+- `public/models/elk.glb`
+- `public/models/fox.glb`
+- `public/models/rabbit.glb`
 - `public/draco/` (Draco decoder files from the official three.js distribution)
 - `public/audio/ambient-forest.mp3`
 - `public/audio/animal-chirp.mp3`
 
-The scene expects these assets to be present in production builds.
+The scene will fall back to simple primitives if a model fails to load.

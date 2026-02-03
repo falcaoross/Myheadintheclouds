@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Sky } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
 import Terrain from "./Terrain.jsx";
 import Animal from "./Animal.jsx";
 
@@ -18,19 +17,10 @@ function createSeededRandom(seed) {
 export default function World() {
   const trunkRef = useRef(null);
   const leafRef = useRef(null);
-  const skyRef = useRef(null);
-  const sunLightRef = useRef(null);
-  const hemiLightRef = useRef(null);
   const trunkGeometry = useMemo(() => new THREE.CylinderGeometry(0.15, 0.2, 2.2, 6), []);
   const leafGeometry = useMemo(() => new THREE.ConeGeometry(1.2, 2.6, 7), []);
-  const trunkMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#5b3f2c", roughness: 0.9, metalness: 0.05 }),
-    []
-  );
-  const leafMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#2f5b3a", roughness: 0.85, metalness: 0.02 }),
-    []
-  );
+  const trunkMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5b3f2c" }), []);
+  const leafMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: "#2f5b3a" }), []);
   const treeData = useMemo(() => {
     const rand = createSeededRandom(42);
     return Array.from({ length: TREE_COUNT }, () => {
@@ -79,49 +69,9 @@ export default function World() {
     leafMesh.instanceMatrix.needsUpdate = true;
   }, [treeData]);
 
-  useFrame((state, delta) => {
-    const elapsed = state.clock.getElapsedTime();
-    const angle = elapsed * 0.03;
-    const sunPosition = new THREE.Vector3(
-      Math.sin(angle) * 30,
-      20 + Math.sin(angle * 0.5) * 3,
-      Math.cos(angle) * 30
-    );
-
-    if (sunLightRef.current) {
-      sunLightRef.current.position.lerp(sunPosition, 1 - Math.pow(0.001, delta));
-      sunLightRef.current.target.position.set(0, 0, 0);
-      sunLightRef.current.target.updateMatrixWorld();
-    }
-
-    if (hemiLightRef.current) {
-      hemiLightRef.current.intensity = 0.35 + Math.sin(angle * 0.2) * 0.02;
-    }
-
-    if (skyRef.current?.material?.uniforms?.sunPosition) {
-      skyRef.current.material.uniforms.sunPosition.value.copy(sunPosition);
-    }
-  });
-
   return (
     <group>
-      <Sky ref={skyRef} sunPosition={[10, 12, 6]} turbidity={4} rayleigh={2.5} mieCoefficient={0.005} />
-      <ambientLight intensity={0.5} />
-      <hemisphereLight
-        ref={hemiLightRef}
-        intensity={0.35}
-        color="#cfe8ff"
-        groundColor="#2a3f2e"
-      />
-      <directionalLight
-        ref={sunLightRef}
-        castShadow
-        intensity={1.1}
-        position={[12, 16, 8]}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-bias={-0.0005}
-      />
+      <Sky sunPosition={[10, 12, 6]} turbidity={5} rayleigh={2} />
       <Terrain />
 
       <instancedMesh
@@ -164,23 +114,23 @@ export default function World() {
         mountable
       />
       <Animal
-        id="dog"
-        name="Dog"
-        url="/models/dog.glb"
-        position={[-6, 0.45, 3]}
+        id="fox"
+        name="Fox"
+        url="/models/fox.glb"
+        position={[-6, 0.5, 3]}
       />
       <Animal
-        id="horse"
-        name="Horse"
-        url="/models/horse.glb"
+        id="elk"
+        name="Elk"
+        url="/models/elk.glb"
         position={[8, 0.5, 6]}
         mountable
       />
       <Animal
-        id="bear"
-        name="Bear"
-        url="/models/bear.glb"
-        position={[-4, 0.5, -4]}
+        id="rabbit"
+        name="Rabbit"
+        url="/models/rabbit.glb"
+        position={[-4, 0.4, -4]}
       />
     </group>
   );

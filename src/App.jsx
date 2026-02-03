@@ -1,9 +1,7 @@
 import { Suspense } from "react";
-import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
-import { KeyboardControls, SoftShadows } from "@react-three/drei";
+import { KeyboardControls } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import World from "./game/World.jsx";
 import Player from "./game/Player.jsx";
 import HUD from "./ui/HUD.jsx";
@@ -19,7 +17,6 @@ const keyboardMap = [
   { name: "right", keys: ["ArrowRight", "KeyD"] },
   { name: "jump", keys: ["Space"] },
   { name: "interact", keys: ["KeyE"] },
-  { name: "dismount", keys: ["KeyF"] },
   { name: "toggleUi", keys: ["KeyH"] }
 ];
 
@@ -42,27 +39,24 @@ export default function App() {
           shadows
           camera={{ fov: 55, position: [0, 3.5, 8] }}
           gl={{ antialias: true, powerPreference: "high-performance" }}
-          onCreated={({ gl }) => {
-            gl.physicallyCorrectLights = true;
-            gl.outputColorSpace = THREE.SRGBColorSpace;
-            gl.toneMapping = THREE.ACESFilmicToneMapping;
-            gl.toneMappingExposure = 1.0;
-          }}
         >
-          <SoftShadows size={20} samples={16} focus={0.6} />
           <Suspense fallback={null}>
-            <color attach="background" args={["#b7d0de"]} />
-            <fogExp2 attach="fog" args={["#b7d0de", 0.02]} />
+            <color attach="background" args={["#a2c3d4"]} />
+            <fog attach="fog" args={["#a2c3d4", 20, 60]} />
+            <ambientLight intensity={0.5} />
+            <directionalLight
+              castShadow
+              position={[12, 16, 8]}
+              intensity={1.1}
+              shadow-mapSize-width={2048}
+              shadow-mapSize-height={2048}
+            />
             <Physics gravity={[0, -9.81, 0]}>
               <World />
               <Player />
             </Physics>
             <InteractionSystem />
             <AudioSystem />
-            <EffectComposer>
-              <Bloom intensity={0.15} luminanceThreshold={0.7} mipmapBlur />
-              <Vignette eskil={false} offset={0.2} darkness={0.35} />
-            </EffectComposer>
           </Suspense>
         </Canvas>
         <HUD />

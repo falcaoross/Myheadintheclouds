@@ -12,8 +12,6 @@ export function InteractionSystem() {
   const animals = useGameStore((state) => state.animals);
   const playerRef = useGameStore((state) => state.playerRef);
   const mountedAnimalId = useGameStore((state) => state.mountedAnimalId);
-  const playerIsGrounded = useGameStore((state) => state.playerIsGrounded);
-  const dismount = useGameStore((state) => state.dismount);
   const setInteraction = useGameStore((state) => state.setInteraction);
   const clearInteraction = useGameStore((state) => state.clearInteraction);
   const toggleControls = useGameStore((state) => state.toggleControls);
@@ -39,21 +37,11 @@ export function InteractionSystem() {
       }
     );
 
-    const unsubDismount = subscribe(
-      (state) => state.dismount,
-      (pressed) => {
-        if (pressed && useGameStore.getState().mountedAnimalId) {
-          dismount();
-        }
-      }
-    );
-
     return () => {
       unsubInteract();
       unsubToggle();
-      unsubDismount();
     };
-  }, [subscribe, toggleControls, dismount]);
+  }, [subscribe, toggleControls]);
 
   useFrame(() => {
     if (!playerRef?.current) {
@@ -64,7 +52,7 @@ export function InteractionSystem() {
     if (mountedAnimalId) {
       const mountedAnimal = animals.get(mountedAnimalId);
       if (mountedAnimal) {
-        setInteraction("Press F to Dismount", null);
+        setInteraction("Press E to Dismount", mountedAnimal);
       }
       return;
     }
@@ -104,8 +92,10 @@ export function InteractionSystem() {
     }
 
     let prompt = "Press E to Pet";
-    if (animal.isRideable && playerIsGrounded && animal.canMount()) {
-      prompt = "Press E to Mount";
+    if (mountedAnimalId === animal.id) {
+      prompt = "Press E to Dismount";
+    } else if (animal.mountable) {
+      prompt = animal.canMount() ? "Press E to Mount" : "Press E to Pet";
     }
 
     setInteraction(prompt, animal);
